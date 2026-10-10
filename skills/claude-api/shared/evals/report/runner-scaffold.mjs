@@ -241,7 +241,7 @@ function checkHarness(statePath, st, approve) {
   const lockfiles = [...new Set([dirname(self), process.cwd()].flatMap(d =>
     ['package-lock.json', 'bun.lock', 'bun.lockb', 'yarn.lock', 'pnpm-lock.yaml'].map(f => join(d, f))))]
     .filter(f => existsSync(f));
-  const paths = [...new Set([self, ...lockfiles, ...listed.map(p => resolve(p))])].sort();
+  const paths = [...new Set([self, ...lockfiles, ...listed.map(p => resolve(p))])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const h = createHash('sha256');
   const hashed = [];
   for (const p of paths) {
