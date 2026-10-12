@@ -270,8 +270,15 @@ def main():
     # Set up live report path
     if args.report != "none":
         if args.report == "auto":
+            # Create the report exclusively under an unpredictable name: a fixed name in the
+            # shared temp directory could be pre-created or symlinked by another local user.
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            live_report_path = Path(tempfile.gettempdir()) / f"skill_description_report_{skill_path.name}_{timestamp}.html"
+            with tempfile.NamedTemporaryFile(
+                prefix=f"skill_description_report_{skill_path.name}_{timestamp}_",
+                suffix=".html",
+                delete=False,
+            ) as report_file:
+                live_report_path = Path(report_file.name)
         else:
             live_report_path = Path(args.report)
         # Open the report immediately so the user can watch
