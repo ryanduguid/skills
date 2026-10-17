@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js" integrity="sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx" crossorigin="anonymous"></script>
   <style>
     :root {
       --bg: #faf9f5;
@@ -829,6 +830,9 @@
     // ---- XLSX rendering via SheetJS ----
     function renderXlsx(container, b64Data) {
       try {
+        if (typeof DOMPurify === "undefined" || !DOMPurify.isSupported) {
+          throw new Error("Spreadsheet preview is unavailable.");
+        }
         const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
         const wb = XLSX.read(raw, { type: "array" });
 
@@ -846,7 +850,13 @@
 
           const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
           const wrapper = document.createElement("div");
-          wrapper.innerHTML = htmlStr;
+          wrapper.appendChild(DOMPurify.sanitize(htmlStr, {
+            ALLOWED_TAGS: ["table", "thead", "tbody", "tfoot", "tr", "th", "td", "colgroup", "col",
+              "a", "span", "b", "strong", "i", "em", "u", "s", "strike", "sub", "sup", "br"],
+            ALLOWED_ATTR: ["href", "title", "colspan", "rowspan", "style", "align", "valign", "width", "height", "span"],
+            ALLOW_DATA_ATTR: false,
+            RETURN_DOM_FRAGMENT: true,
+          }));
           container.appendChild(wrapper);
         }
       } catch (err) {
@@ -882,7 +892,7 @@
       const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
       html += '<div class="grades-summary">';
       html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
-      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '<span>' + escapeHtml(summary.passed || 0) + ' passed, ' + escapeHtml(summary.failed || 0) + ' failed of ' + escapeHtml(summary.total || 0) + '</span>';
       html += '</div>';
 
       // Assertions list
@@ -1013,7 +1023,8 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reviews, status: "in_progress" }),
-      }).then(() => {
+      }).then((response) => {
+        if (!response.ok) throw new Error(`Feedback save failed: ${response.status}`);
         document.getElementById("feedback-status").textContent = "Saved";
       }).catch(() => {
         // Static mode or server unavailable — no-op on auto-save,
@@ -1045,7 +1056,8 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: payload,
-      }).then(() => {
+      }).then((response) => {
+        if (!response.ok) throw new Error(`Feedback save failed: ${response.status}`);
         document.getElementById("done-overlay").classList.add("visible");
       }).catch(() => {
         // Server not available (static mode) — download as file
@@ -1099,7 +1111,7 @@
     function escapeHtml(text) {
       const div = document.createElement("div");
       div.textContent = text;
-      return div.innerHTML;
+      return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
 
     // ---- View switching ----
@@ -1129,9 +1141,9 @@
       html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
       html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
       if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
-      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
-      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
-      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      if (metadata.timestamp) html += escapeHtml(metadata.timestamp) + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + escapeHtml(metadata.evals_run.join(", ")) + " &mdash; ";
+      html += escapeHtml(metadata.runs_per_configuration || "?") + " runs per configuration";
       html += "</p>";
 
       // Summary table
@@ -1169,14 +1181,14 @@
       html += "<tr><td><strong>Pass Rate</strong></td>";
       html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
       html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
-      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + escapeHtml(delta.pass_rate || "—") + "</td></tr>";
 
       // Time (only show row if data exists)
       if (a.time_seconds || b.time_seconds) {
         html += "<tr><td><strong>Time (s)</strong></td>";
         html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
         html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
-        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + escapeHtml(delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
       }
 
       // Tokens (only show row if data exists)
@@ -1184,7 +1196,7 @@
         html += "<tr><td><strong>Tokens</strong></td>";
         html += "<td>" + fmtStat(a.tokens, false) + "</td>";
         html += "<td>" + fmtStat(b.tokens, false) + "</td>";
-        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + escapeHtml(delta.tokens || "—") + "</td></tr>";
       }
 
       html += "</tbody></table>";
@@ -1225,11 +1237,11 @@
               const r = run.result || {};
               const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
               html += '<tr class="' + rowClass + '">';
-              html += "<td>" + configLabel + "</td>";
-              html += "<td>" + run.run_number + "</td>";
-              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              html += "<td>" + escapeHtml(configLabel) + "</td>";
+              html += "<td>" + escapeHtml(run.run_number) + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + escapeHtml(r.passed || 0) + "/" + escapeHtml(r.total || 0) + ")</td>";
               if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
-              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              if (hasErrors) html += "<td>" + escapeHtml(r.errors || 0) + "</td>";
               html += "</tr>";
             }
 
@@ -1238,7 +1250,7 @@
             const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
             const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
             html += '<tr class="benchmark-row-avg ' + rowClass + '">';
-            html += "<td>" + configLabel + "</td>";
+            html += "<td>" + escapeHtml(configLabel) + "</td>";
             html += "<td>Avg</td>";
             html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
             if (hasTime) {
@@ -1289,7 +1301,7 @@
                   if (exp) {
                     const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
                     const icon = exp.passed ? "\u2713" : "\u2717";
-                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                    html += '<span class="' + cls + '" title="' + escapeHtml("Run " + run.run_number + ": " + (exp.evidence || "")) + '">' + icon + "</span> ";
                   } else {
                     html += "— ";
                   }
