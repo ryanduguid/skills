@@ -1,6 +1,6 @@
 > **Note:** This repository contains Anthropic's implementation of skills for Claude. For information about the Agent Skills standard, see [agentskills.io](http://agentskills.io).
 
-[![skills.sh](https://skills.sh/b/anthropics/skills)](https://skills.sh/anthropics/skills)
+[![skills.sh](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fskills.sh%2Fb%2Fanthropics%2Fskills&query=substring-after%28%2F*%5Blocal-name%28%29%3D%27svg%27%5D%2F*%5Blocal-name%28%29%3D%27title%27%5D%2C%27Skills%3A+%27%29&label=Skills&style=flat&labelColor=000000&color=66023C)](https://skills.sh/anthropics/skills)
 
 # Skills
 Skills are folders of instructions, scripts, and resources that Claude loads dynamically to improve performance on specialized tasks. Skills teach Claude how to complete specific tasks in a repeatable way, whether that's creating documents with your company's brand guidelines, analyzing data using your organization's specific workflows, or automating personal tasks.
